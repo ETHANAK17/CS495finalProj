@@ -168,7 +168,7 @@ def get_ground_distance(height, hypotenuse):
     return math.sqrt(hypotenuse**2 - height**2)
 
 
-def calc_new_location_to_target(from_lat, from_lon, heading, distance):
+def calc_new_location_to_target(from_lat, from_lon, heading, distance1):
 
     from geopy import distance
     from geopy import Point
@@ -179,7 +179,7 @@ def calc_new_location_to_target(from_lat, from_lon, heading, distance):
 
     origin = Point(from_lat, from_lon)
     destination = distance.distance(
-        kilometers=(distance*.001)).destination(origin, heading)
+        kilometers=(distance1*.001)).destination(origin, heading)
 
     return destination.latitude, destination.longitude
 
