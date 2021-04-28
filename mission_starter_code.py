@@ -287,7 +287,7 @@ def main():
     global log
 
     # Setup a log file for recording important activities during our session.
-    log_file = time.strftime("TEAM_NAME_PEX03_%Y%m%d-%H%M%S") + ".log"
+    log_file = time.strftime("Ethan_and_Josh_PEX03_%Y%m%d-%H%M%S") + ".log"
 
     # prepare log file...
     handlers = [logging.FileHandler(log_file), logging.StreamHandler()]
