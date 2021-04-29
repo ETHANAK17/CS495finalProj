@@ -1,4 +1,6 @@
 # Uncomment when using the realsense camera
+import math
+
 import pyrealsense2.pyrealsense2 as rs  # For (most) Linux and Macs
 # import pyrealsense2 as rs # For Windows
 import numpy as np
@@ -283,9 +285,9 @@ def conduct_mission():
         counter += 1
 
 def angle():
-    '''
-    gets current angle of the realsense
-    '''
+
+    # gets current angle of the realsense
+
     anglepip = rs.pipeline()
     angleconfig = rs.config()
     angleconfig.enable_stream(rs.stream.accel)
