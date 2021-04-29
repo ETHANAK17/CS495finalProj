@@ -8,7 +8,7 @@ import argparse
 import imutils
 import time
 import cv2
-import pyrealsense2.pyrealsense2 as rs
+import pyrealsense2 as rs
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()

@@ -1,3 +1,4 @@
+
 # Uncomment when using the realsense camera
 import math
 
@@ -19,6 +20,7 @@ import os
 import glob
 import shutil
 from pathlib import Path
+import argparse
 
 log = None  # logger instance
 GRIPPER_OPEN = 1087
@@ -92,6 +94,29 @@ last_point = None  # center point in pixels
 # Configure realsense camera stream
 pipeline = rs.pipeline()
 config = rs.config()
+
+# construct the argument parse and parse the arguments
+ap = argparse.ArgumentParser()
+ap.add_argument("-p", "--prototxt", required=True,
+                help="path to Caffe 'deploy' prototxt file")
+ap.add_argument("-m", "--model", required=True,
+                help="path to Caffe pre-trained model")
+ap.add_argument("-c", "--confidence", type=float, default=0.2,
+                help="minimum probability to filter weak detections")
+
+# todo: uncomment when deploying...
+# args = vars(ap.parse_args())
+
+# initialize the list of class labels MobileNet SSD was trained to
+# detect, then generate a set of bounding box colors for each class
+CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
+           "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
+           "dog", "horse", "motorbike", "person", "pottedplant", "sheep",
+           "sofa", "train", "tvmonitor"]
+
+COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
+
+live=True
 
 def release_grip(seconds=2):
     sec=1
@@ -186,16 +211,67 @@ def calc_new_location_to_target(from_lat, from_lon, heading, distance1):
     return destination.latitude, destination.longitude
 
 
-def check_for_initial_target():
-    return None
+def check_for_initial_target(net, swapRB = False):
+    frame = get_cur_frame()
+
+    (h, w) = frame.shape[:2]
+    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
+                                 0.007843, (300, 300), 127.5,  swapRB=swapRB, crop=False)
+    # pass the blob through the network and obtain the detections and
+    # predictions
+    net.setInput(blob)
+    detections = net.forward()
+    cv2.namedWindow("Frame", cv2.WINDOW_AUTOSIZE)
+
+    # loop over the detections
+    for i in np.arange(0, detections.shape[2]):
+        # extract the confidence (i.e., probability) associated with
+        # the prediction
+        confidence = detections[0, 0, i, 2]
+
+        # filter out weak detections by ensuring the `confidence` is
+        # greater than the minimum confidence
+        if confidence > 0.25:  # args["confidence"]:
+            # extract the index of the class label from the
+            # `detections`, then compute the (x, y)-coordinates of
+            # the bounding box for the object
+            idx = int(detections[0, 0, i, 1])
+
+            if CLASSES[idx]=="person":
+                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+                (startX, startY, endX, endY) = box.astype("int")
+
+                # draw the prediction on the frame
+                label = "{}: {:.2f}%".format(CLASSES[idx],
+                                             confidence * 100)
+                cv2.rectangle(frame, (startX, startY), (endX, endY),
+                              COLORS[idx], 2)
+                y = startY - 15 if startY - 15 > 15 else startY + 15
+                cv2.putText(frame, label, (startX, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
+
+    # show the output frame
+    cv2.imshow("Frame", frame)
+
+    if 'startX' in locals():
+        center = ((endX-startX)/2 + startX, (endX-startX)/2 + startX)
+        x = startX
+        y = startY
+        radius = (endY - startY + endX - startX)/2
+
+        return center, radius, (x, y), frame
+
+    else:
+        return None
 
 def determine_drone_actions(last_point, frame, target_sightings):
     return
 
-def conduct_mission():
+def conduct_mission(net):
     # Here, we will loop until we find a human target and deliver the care package,
     # or until the drone's flight plan completes (and we land).
     logging.info("Searching for target...")
+
 
     target_sightings = 0
     global counter, mission_mode, last_point, last_obj_lon, \
@@ -220,7 +296,7 @@ def conduct_mission():
         last_heading = drone.heading
 
         # look for a target in current frame
-        center, radius, (x, y), frame = check_for_initial_target()
+        center, radius, (x, y), frame = check_for_initial_target(net)
 
         if center is not None:
 
@@ -350,6 +426,12 @@ def main():
         log.info("No mission to execute.")
         return
 
+    # load serialized caffe model from disk
+    print("[INFO] loading model...")
+
+    # for now, just directly supply args here...
+    net = cv2.dnn.readNetFromCaffe("MobileNetSSD_deploy.prototxt.txt", "MobileNetSSD_deploy.caffemodel")
+
     # Arm the drone.
     drone_lib.arm_device(drone, log=log)
 
@@ -366,7 +448,7 @@ def main():
         backup_prev_experiment(IMG_SNAPSHOT_PATH)
 
         # Now, look for target...
-        conduct_mission()
+        conduct_mission(net)
 
         # Mission is over; disarm and disconnect.
         log.info("Disarming device...")
