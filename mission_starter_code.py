@@ -282,6 +282,38 @@ def conduct_mission():
 
         counter += 1
 
+def angle():
+    '''
+    gets current angle of the realsense
+    '''
+    anglepip = rs.pipeline()
+    angleconfig = rs.config()
+    angleconfig.enable_stream(rs.stream.accel)
+    anglepip.start(angleconfig)
+    
+    camera_angle = 0
+    
+    try:
+        while True:
+            f1 = anglepip.wait_for_frames()
+            accel = f1[0].as_motion_frame().get_motion_data()
+    
+            if not accel:
+                print("no frame at cam ")
+                continue
+    
+            accel_angle_x = math.degrees(math.atan2(accel.y, accel.z))
+            accel_angle_x = int(accel_angle_x)
+            camera_angle= accel_angle_x
+            break
+    
+    finally:
+        anglepip.stop()
+    
+    print("camera angle = " + str(camera_angle))
+    return camera_angle        
+
+        
 def main():
     global drone
     global log
